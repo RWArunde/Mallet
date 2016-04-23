@@ -64,6 +64,8 @@ public class LDA implements Serializable {
 		tokensPerTopic = new int[numTopics];
 		tAlpha = alpha * numTopics;
 		vBeta = beta * numTypes;
+		
+		
 
 		long startTime = System.currentTimeMillis();
 
@@ -318,8 +320,12 @@ public class LDA implements Serializable {
 					System.out.println (ilist.getDataAlphabet().lookupObject(wp[i].wi).toString() + " " + wp[i].p);
 			} else {
 				System.out.print ("Topic "+ti+": ");
-				for (int i = 0; i < numWords; i++)
-					System.out.print (ilist.getDataAlphabet().lookupObject(wp[i].wi).toString() + " ");
+				for (int i = 0; i < numWords; i++) {
+					//System.out.println(wp[i].p);
+					if(wp[i].p > 0) {
+						System.out.print (ilist.getDataAlphabet().lookupObject(wp[i].wi).toString() + " ");
+					}
+				}
 				System.out.println();
 			}
 		}
