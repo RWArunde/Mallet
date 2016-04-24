@@ -32,9 +32,9 @@ import org.apache.commons.math3.special.Gamma;
 
 public class RedditLDA {
 
-	int numTopics; // Number of topics to be fit
+	public int numTopics; // Number of topics to be fit
 	double alphaScalar; //Scalar alpha value
-	double[][] alpha; //Matrix of alpha values, indexed by <subreddit, topic>
+	public double[][] alpha; //Matrix of alpha values, indexed by <subreddit, topic>
 	double beta;	 // Prior on per-topic multinomial distribution over words
 	double vBeta;
 	double gamma;	// Bernoulli prior for each alpha to be (alphaScalar) rather than (alphaScalar * eta)
@@ -56,7 +56,7 @@ public class RedditLDA {
 	int[] tokensPerDoc; // number of tokens in each document
 	int[][] tokensPerSubPerTopic; //indexed by <subreddit index, topic index>
 	
-	HashMap<String, Integer> subredditMap;
+	public HashMap<String, Integer> subredditMap;
 
 	public RedditLDA (InstanceList documents, String topSub, int numberOfTopics, double alpha, double beta, double gamma, double eta)
 	{
@@ -156,7 +156,7 @@ public class RedditLDA {
 			System.out.flush();
 			if (showTopicsInterval != 0 && iterations % showTopicsInterval == 0 && iterations > 0) {
 				System.out.println ();
-				printTopWords (5, false);
+				printTopWords (50, false);
 			}
 		
 			sampleTopicsForDocs(docIndexStart, docIndexLength, r);
@@ -495,6 +495,48 @@ public class RedditLDA {
 		}
 		System.out.println("Model Log Likelihood: " + this.getLogLikelihood());
 	}
+	
+	
+	public void saveTopWords (int numWords, boolean useNewLines, String fname) throws Exception
+	{
+		class WordProb implements Comparable {
+			int wi;
+			double p;
+			public WordProb (int wi, double p) { this.wi = wi; this.p = p; }
+			public final int compareTo (Object o2) {
+				if (p > ((WordProb)o2).p)
+					return -1;
+				else if (p == ((WordProb)o2).p)
+					return 0;
+				else return 1;
+			}
+		}
+		
+		Writer writer = new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream(fname), "utf-8"));
+
+		WordProb[] wp = new WordProb[numTypes];
+		for (int ti = 0; ti < numTopics; ti++) {
+			for (int wi = 0; wi < numTypes; wi++)
+				wp[wi] = new WordProb (wi, ((double)typeTopicCounts[wi][ti]) / tokensPerTopic[ti]);
+			Arrays.sort (wp);
+			if (useNewLines) {
+				
+				writer.write ("\nTopic "+ti+"\n");
+				for (int i = 0; i < numWords; i++)
+					writer.write (ilist.getDataAlphabet().lookupObject(wp[i].wi).toString() + " " + wp[i].p + "\n");
+			} else {
+				writer.write ("Topic "+ti+": ");
+				for (int i = 0; i < numWords; i++)
+					writer.write (ilist.getDataAlphabet().lookupObject(wp[i].wi).toString() + " ");
+				writer.write("\n");
+			}
+		}
+		writer.close();
+	}
+
+	
+	
 
 	public void printDocumentTopics (File f) throws IOException
 	{
