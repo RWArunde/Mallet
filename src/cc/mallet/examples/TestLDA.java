@@ -131,12 +131,13 @@ public class TestLDA {
 			//LDA("nhl", 1000, 20, alpha, 0.01, instances);
 		}
 		
-		for(double alpha: new double[]{0.25, 0.5, 1, 5}) {
-			//keep track of these workers- we'll need to check when they finish. 
-			ArrayList<LDAWorker> workers = new ArrayList<LDAWorker>();
+		for(double alpha: new double[]{0.25, 0.5, 1, 5}) {		
 			
 			for(double gamma: new double[]{0.25, 0.15, 0.05, 0.005}) {
-				for(double eta: new double[]{0.01, 0.005, 0.001}) {
+				//keep track of these workers- we'll need to check when they finish. 
+				ArrayList<LDAWorker> workers = new ArrayList<LDAWorker>();
+				
+				for(double eta: new double[]{0.01, 0.005, 0.001, 0.0005}) {
 					
 					LDAWorker worker = new LDAWorker(topsub, iterations, topics, alpha, 0.01, gamma, eta, instances);
 					worker.start();
@@ -144,12 +145,14 @@ public class TestLDA {
 					
 					//SparseLDA("nhl", 1000, 20, alpha, 0.01, gamma, eta, instances);
 				}
+				
+				//wait for workers to finish
+				for(LDAWorker e : workers) {
+					e.join();
+				}
+				
 			}
 			
-			//wait for workers to finish
-			for(LDAWorker e : workers) {
-				e.join();
-			}
 		}
 		
 		
