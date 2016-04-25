@@ -390,6 +390,11 @@ public class RedditLDA {
 	}
 	
 	public HashMap<String, double[]> getSubredditTopicDistributions() {
+		//by default, return smoothed distributions (alphas included)
+		return getSubredditTopicDistributions(true);
+	}
+	
+	public HashMap<String, double[]> getSubredditTopicDistributions(boolean smoothed) {
 		
 		HashMap<String, double[]> targetTopics = new HashMap<String, double[]>();
         HashMap<String, Integer> targetTotals = new HashMap<String, Integer>();
@@ -400,7 +405,7 @@ public class RedditLDA {
         }
         
         for(int c = 0; c < this.numDocs; c++) {
-        	double[] topicDist = this.getTopicProbabilities(c);
+        	double[] topicDist = this.getTopicProbabilities(c, smoothed);
         	String target = this.ilist.get(c).getTarget().toString();
         	double[] totalDist = targetTopics.get(target);
         	for(int i = 0; i < numTopics; i++){
@@ -413,6 +418,9 @@ public class RedditLDA {
         for(String target: targetset) {
         	double[] dist = targetTopics.get(target);      	
         	for(int c = 0; c < numTopics; c++) {
+        		if(targetTotals.get(target) == 0) {
+        			System.out.println("Shit is zero for this sub yo: " + target);
+        		}
         		dist[c] = dist[c] / targetTotals.get(target);
         	}
         	targetTopics.put(target, dist);
@@ -422,19 +430,31 @@ public class RedditLDA {
 	}
 	
 	
-	public double[] getTopicProbabilities(int instanceID) {
+	public double[] getTopicProbabilities(int instanceID, boolean smoothed) {
 		//get subreddit ID
 		int sub = this.docSubreddit[instanceID];//this.subredditMap.get(this.ilist.get(instanceID).getTarget().toString());
 		int[] topicCounts = docTopicCounts[instanceID];
 		double[] a = this.alpha[sub];
 		
 		double[] topicProbs = new double[numTopics];
+		
+		if(this.tokensPerDoc[instanceID] == 0) {
+			return topicProbs;
+		}
+		
 		double sum = 0;
 		for(int i = 0; i < this.numTopics; i++){
-			topicProbs[i] = topicCounts[i] + a[i];
+			if(smoothed) {
+				topicProbs[i] = topicCounts[i] + a[i];
+			} else {
+				topicProbs[i] = topicCounts[i];
+			}
 			sum += topicProbs[i];
 		}
 		for(int i = 0; i < this.numTopics; i++) {
+			if(sum == 0) {
+				System.out.println("CRAP");
+			}
 			topicProbs[i] /= sum;
 		}
 		return topicProbs;

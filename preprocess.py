@@ -1,10 +1,11 @@
-import sys, json
+import sys, json, random
 
 
 lines = [line.strip() for line in open(sys.argv[1],"r").readlines()]
 
 data = [json.loads(line) for line in lines]
 
+docsubbody = []
 
 f = open('out.txt','w')
 doc = None
@@ -16,6 +17,7 @@ for d in data:
 	
 	if doc != d['link_id']:
 		if len(body) > 5:
+			docsubbody.append( (doc, sub, body) )
 			f.write(doc + '\t' + sub + '\t' + body + '\n')
 		body = ''
 	
@@ -31,6 +33,13 @@ for d in data:
 		print str(e)
 		
 	sub = d['subreddit']
-	
+
+docsubbody.append( (doc, sub, body) )	
 f.write(doc + '\t' + sub + '\t' + body + '\n')
 f.close()
+
+g = open('out_shuffled.txt', 'w')
+random.shuffle(docsubbody)
+for (doc, sub, body) in docsubbody:
+	g.write(doc + '\t' + sub + '\t' + body + '\n')
+g.close()

@@ -34,7 +34,7 @@ public class TestLDA {
 	}
 	
 	public static void write_sub_dists(RedditLDA model, String fname) throws Exception {
-		HashMap<String, double[]> targetTopics = model.getSubredditTopicDistributions();
+		HashMap<String, double[]> targetTopics = model.getSubredditTopicDistributions(false);
 		Writer writer = new BufferedWriter(new OutputStreamWriter(
                 new FileOutputStream(fname), "utf-8"));
         writer.write("{");
@@ -111,17 +111,48 @@ public class TestLDA {
 		
 		System.out.println("Stuff is working");
 		
+		//TestLDA.SparseLDA("nhl", 100, 20, 1, 0.01, 0.10, 0.005, instances);
+		//TestLDA.LDA("nhl", 100, 20, 1, 0.01, instances);
+		
+		
+		String topsub = "nfl";
+		int iterations = 1000;
+		int topics = 20;
+		
+		//Start workers for regular LDA
 		for(double alpha : new double[]{0.05, 0.25, 0.5, 1, 5}) {
-			LDA("nhl", 1000, 20, alpha, 0.01, instances);
+			LDAWorker worker = new LDAWorker(topsub, iterations, topics, alpha, 0.01, 9000, 9000, instances);
+			worker.start();
+			
+			// Lose track of the worker. Assume it will finish by the time the SparseLDA workers do.
+			// good enough for grad school.
+			
+			
+			//LDA("nhl", 1000, 20, alpha, 0.01, instances);
 		}
 		
-		for(double alpha: new double[]{0.5, 1, 5}) {
-			for(double gamma: new double[]{0.15, 0.05, 0.005}) {
+		for(double alpha: new double[]{0.25, 0.5, 1, 5}) {
+			//keep track of these workers- we'll need to check when they finish. 
+			ArrayList<LDAWorker> workers = new ArrayList<LDAWorker>();
+			
+			for(double gamma: new double[]{0.25, 0.15, 0.05, 0.005}) {
 				for(double eta: new double[]{0.01, 0.005, 0.001}) {
-					SparseLDA("nhl", 1000, 20, alpha, 0.01, gamma, eta, instances);
+					
+					LDAWorker worker = new LDAWorker(topsub, iterations, topics, alpha, 0.01, gamma, eta, instances);
+					worker.start();
+					workers.add(worker);
+					
+					//SparseLDA("nhl", 1000, 20, alpha, 0.01, gamma, eta, instances);
 				}
 			}
+			
+			//wait for workers to finish
+			for(LDAWorker e : workers) {
+				e.join();
+			}
 		}
+		
+		
 		
 		
 		
