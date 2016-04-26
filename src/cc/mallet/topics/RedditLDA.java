@@ -17,6 +17,8 @@ import cc.mallet.types.*;
 import cc.mallet.util.ArrayUtils;
 import cc.mallet.util.Randoms;
 
+import gov.sandia.cognition.statistics.distribution.DirichletDistribution;
+
 import org.apache.commons.math3.special.Gamma;
 
 
@@ -45,7 +47,7 @@ public class RedditLDA {
 	int numDocs;
 	int numTypes;
 	int numTokens;
-	int numSubreddits; //number of subreddits
+	public int numSubreddits; //number of subreddits
 	int[] docsPerSub;
 	int[] docSubreddit; //subreddit each document is from
 	int[][] docTopicCounts; // indexed by <document index, topic index>
@@ -57,6 +59,8 @@ public class RedditLDA {
 	int[][] tokensPerSubPerTopic; //indexed by <subreddit index, topic index>
 	
 	public HashMap<String, Integer> subredditMap;
+	public double FMacro;
+	
 
 	public RedditLDA (InstanceList documents, String topSub, int numberOfTopics, double alpha, double beta, double gamma, double eta)
 	{
@@ -391,10 +395,15 @@ public class RedditLDA {
 	
 	public HashMap<String, double[]> getSubredditTopicDistributions() {
 		//by default, return smoothed distributions (alphas included)
-		return getSubredditTopicDistributions(true);
+		return getSubredditTopicDistributions(true, this.numDocs);
 	}
 	
 	public HashMap<String, double[]> getSubredditTopicDistributions(boolean smoothed) {
+		//by default, return smoothed distributions (alphas included)
+		return getSubredditTopicDistributions(smoothed, this.numDocs);
+	}
+	
+	public HashMap<String, double[]> getSubredditTopicDistributions(boolean smoothed, int end) {
 		
 		HashMap<String, double[]> targetTopics = new HashMap<String, double[]>();
         HashMap<String, Integer> targetTotals = new HashMap<String, Integer>();
@@ -404,7 +413,12 @@ public class RedditLDA {
         	targetTotals.put(target,  0);
         }
         
-        for(int c = 0; c < this.numDocs; c++) {
+        for(int c = 0; c < end; c++) {
+        	
+        	if(this.tokensPerDoc[c] == 0) {
+    			continue;
+    		}
+        	
         	double[] topicDist = this.getTopicProbabilities(c, smoothed);
         	String target = this.ilist.get(c).getTarget().toString();
         	double[] totalDist = targetTopics.get(target);
@@ -458,6 +472,117 @@ public class RedditLDA {
 			topicProbs[i] /= sum;
 		}
 		return topicProbs;
+	}
+	
+	public double[] dubsum(double[] a, double[] b) {
+		for(int c = 0; c < a.length; c++) {
+			a[c] += b[c];
+		}
+		return a;
+	}
+	
+	public double sum(double[] a) {
+		double s = 0;
+		for(int c = 0; c < a.length; c++) {
+			s += a[c];
+		}
+		return s;
+	}
+	
+	public int classifyDoc(int doc, int samples, HashMap<String, double[]> subDists, int[][] confusion) {
+		Randoms r = new Randoms();
+		gov.sandia.cognition.math.matrix.VectorFactory vectorFactory = gov.sandia.cognition.math.matrix.VectorFactory.getDenseDefault();
+		
+		double maxp = 0;
+		int maxsub = -1;
+		int label = this.docSubreddit[doc];
+		
+		for(int sub = 0; sub < this.numSubreddits; sub++) {
+
+			double[] docDist = new double[this.numTopics];
+			this.docSubreddit[doc] = sub;
+			double[] subDist = new double[this.numTopics];
+			for(String subb : this.subredditMap.keySet()) {
+				if(this.subredditMap.get(subb) == sub) {
+					subDist = subDists.get(subb);
+				}
+			}
+			
+			for(int c = 0; c < samples; c++) {
+				double[] topicWeights = new double[this.numTopics];
+				this.sampleTopicsForOneDoc((FeatureSequence)ilist.get(doc).getData(),
+						 topics[doc], docTopicCounts[doc], topicWeights, sub, r);
+				docDist = this.dubsum(docDist, this.getTopicProbabilities(doc, true));
+			}
+			
+			//System.out.println(sum(docDist));
+			//System.out.println(sum(subDist));
+			//System.out.println();
+			double sumdoc = sum(docDist);
+			double sumsub = sum(subDist);
+			
+			for(int c = 0; c < this.numTopics; c++) {
+				//System.out.print(docDist[c] + " ");
+				docDist[c] /= sumdoc;
+				subDist[c] /= sumsub;
+				subDist[c] *= 50;
+			}
+			//System.out.println();
+			
+			DirichletDistribution dir = new DirichletDistribution();
+			dir.setParameters(vectorFactory.copyArray(subDist));
+			double p = dir.getProbabilityFunction().evaluate(vectorFactory.copyArray(docDist));
+
+			if( p > maxp) {
+				maxp = p;
+				maxsub = sub;
+			}
+			
+		}
+		//System.out.println("Guess is: " + maxsub + "\tLabel is: " + label);
+		this.docSubreddit[doc] = label;
+		
+		confusion[label][maxsub]++;
+		
+		return maxsub==label? 1: 0;
+	}
+	
+	//classify the subreddit of the last fifth of the documents
+	public double classifyDocuments(int samples, int[][] confusion) {
+		double accuracy = 0;
+		int total = 0;
+		int[] subTotals = new int[this.numSubreddits];
+		int start = (int) Math.ceil(this.numDocs * 0.8);
+		
+		HashMap<String, double[]> subDists = this.getSubredditTopicDistributions(true, (int) Math.floor(this.numDocs * 0.8));
+		
+		for(int c = start; c < this.numDocs; c++) {
+			
+			if(this.tokensPerDoc[c] == 0) {
+				continue;
+			}
+			subTotals[this.docSubreddit[c]] ++;
+			accuracy += classifyDoc(c, samples, subDists, confusion);
+			total ++;
+		}
+		
+		//calculate f-macro score
+		double f = 0;
+		for(int label = 0; label < this.numSubreddits; label++) {
+			int truePos = confusion[label][label];
+			int actualPos = subTotals[label];
+			int totalPreds = 0;
+			for(int sub = 0; sub < this.numSubreddits; sub++) {
+				totalPreds += confusion[sub][label];
+			}
+			
+			double pres = (double) truePos / (double) totalPreds;
+			double recall = (double) truePos / (double) actualPos;
+			f += 2 * (pres * recall) / (pres + recall);
+		}
+		
+		this.FMacro =  f / this.numSubreddits;
+		return accuracy / total;
 	}
 	
 	public int[][] getDocTopicCounts(){

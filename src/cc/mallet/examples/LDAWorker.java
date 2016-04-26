@@ -40,7 +40,7 @@ public class LDAWorker extends Thread {
 			}
 		} else {
 			try {
-				TestLDA.SparseLDA(topsub, iters, topics, alpha, beta, gamma, beta, docs);
+				TestLDA.SparseLDA(topsub, iters, topics, alpha, beta, gamma, eta, docs);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

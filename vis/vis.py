@@ -43,9 +43,10 @@ for k, v in subred.iteritems():
 	nba.append(v)
 
 #get xlabels
-xlabels = [line.strip().split('\t')[-1] for line in open('topic_words.txt').readlines()]
+#xlabels = [line.strip().split('\t')[-1] for line in open('topic_words.txt').readlines()]
 #hide them
-xlabels = ['' for l in xlabels]
+#xlabels = ['' for l in xlabels]
+xlabels = []
 
 nba = np.array(nba)
 
@@ -121,7 +122,7 @@ for c in range(nba.shape[1]):
 
 
 ax.pcolor(nba2, cmap=plt.cm.Blues, alpha=0.8)	
-plt.savefig('LDA_football_sorted.png')
+plt.savefig('LDA_'+sys.argv[2]+'_sorted.png')
 
 for c in range(nba.shape[0]):	
 	print ylabels[c] + "\t" + str(np.var(nba[c,:]))
